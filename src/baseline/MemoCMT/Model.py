@@ -127,7 +127,6 @@ class MemoCMT(nn.Module):
             audio_proj = audio_norm.mean(dim=1)
             return {
                 "logits": out,
-                "fusion": x,
                 "text_proj": text_proj,
                 "audio_proj": audio_proj,
                 "text_pool": text_proj,

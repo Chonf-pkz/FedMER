@@ -1,6 +1,6 @@
-# Example configuration for LOSO with fixed validation speaker
+# MSP-IMPROV speaker-shard configuration using pre-extracted features
 
-dataset: IEMOCAP
+dataset: MSP-IMPROV
 num_classes: 4
 
 model:
@@ -8,22 +8,18 @@ model:
   name: fleser
 
 paths:
-  data_root: /home/minhnhutngnn/IEMOCAP_full_release
-  out_base: metadata/IEMOCAP_loso/clients
-  run_id: run_20260608_speaker4shards_3emo_5seeds
-  features_base: features/IEMOCAP/clients
+  data_root: null
+  out_base: metadata/MSP_IMPROV_loso/clients
+  run_id: run_20260615_speaker4shards_3emo_5seeds
+  features_base: features/MSP-IMPROV/clients
   checkpoints_root: checkpoints/federated
   logs_root: logs/federated
 
 loso:
   split_by: speaker_shards
-  # speaker_shards: each speaker is split into 4 clients; each client
-  # contains samples from exactly one speaker and at most 3 emotion classes.
-  # Validation is split locally inside each client with 80/20 train/val;
-  # no shared validation session is used in this setting.
   val_speaker: null
   test_speakers: null
-  test_sessions: [5]
+  test_sessions: [6]
   seeds: [42, 52, 103, 128, 923]
   num_clients: null
   shards_per_speaker: 4
@@ -31,8 +27,8 @@ loso:
   client_val_ratio: 0.2
   min_labeled_per_client: 1
   seed: 42
-  exp_prefix: IEMOCAP_speaker_shards
-  run_id: run_20260608_speaker4shards_3emo_5seeds
+  exp_prefix: MSP_IMPROV_speaker_shards
+  run_id: run_20260615_speaker4shards_3emo_5seeds
   clean_metadata: false
   clean_features: false
   eval_checkpoint: best
@@ -46,7 +42,7 @@ federated:
   weight_decay: 0.01
   weight_by: total
   best_metric: global_UA
-  fl_method: fedproc
+  fl_method: fedbn
   fedprox_mu: 0.0
   scaffold_control_weighted: 0
   num_workers: 5

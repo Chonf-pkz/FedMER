@@ -4,6 +4,8 @@ import os
 import multiprocessing as mp
 import sys
 
+import torch
+
 _ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 if _ROOT not in sys.path:
     sys.path.insert(0, _ROOT)
@@ -51,6 +53,25 @@ def _eval_worker(payload):
     return evaluate_global(**payload)
 
 
+def _load_client_bn_states(checkpoint):
+    directory, filename = os.path.split(checkpoint)
+    if filename == "global_round_latest.pt":
+        sidecar = os.path.join(directory, "client_bn_states_latest.pt")
+    elif filename.startswith("global_round_best_"):
+        sidecar = os.path.join(directory, filename.replace("global_round_", "client_bn_states_", 1))
+    else:
+        return {}
+    return torch.load(sidecar, map_location="cpu") if os.path.isfile(sidecar) else {}
+
+
+def _with_client_bn(state_dict, client_bn_state):
+    if not client_bn_state:
+        return state_dict
+    state = dict(state_dict)
+    state.update(client_bn_state)
+    return state
+
+
 def parse_args():
     parser = argparse.ArgumentParser(description="Evaluate a federated global checkpoint")
     parser.add_argument("--dataset", type=str, required=True, choices=["IEMOCAP", "MSP-IMPROV", "ESD", "MELD"])
@@ -88,6 +109,7 @@ def evaluate_checkpoint(
 ):
     model_name = normalize_model_name(model_name)
     state_dict = load_state_dict(checkpoint)
+    client_bn_states = _load_client_bn_states(checkpoint)
     cfg = {
         "dataset": dataset,
         "num_classes": num_classes,
@@ -109,7 +131,7 @@ def evaluate_checkpoint(
             "client_id": client_id,
             "cfg": cfg,
             "features_dir": features_dir,
-            "state_dict": state_dict,
+            "state_dict": _with_client_bn(state_dict, client_bn_states.get(client_id)),
             "split": "test",
         })
 

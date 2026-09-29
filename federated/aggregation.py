@@ -208,14 +208,20 @@ def fednova(global_state, state_dicts, weights, local_steps, cast_back=True):
 
     return aggregated
 
+def batchnorm_state_keys(model):
+    """Return all BatchNorm parameters and buffers in a model state dict."""
+    keys = set()
+    for module_name, module in model.named_modules():
+        if isinstance(module, torch.nn.modules.batchnorm._BatchNorm):
+            prefix = f"{module_name}." if module_name else ""
+            keys.update(prefix + name for name, _ in module.named_parameters(recurse=False))
+            keys.update(prefix + name for name, _ in module.named_buffers(recurse=False))
+    return keys
+
+
 @torch.no_grad()
-def fedbn(state_dicts, weights, cast_back=True):
-    """Federated Batch Normalization averaging.
-    
-    FedBN excludes BatchNorm parameters (running_mean, running_var) from 
-    averaging while averaging all other parameters normally. This allows 
-    each client to maintain local batch normalization statistics.
-    """
+def fedbn(global_state, state_dicts, weights, bn_keys, cast_back=True):
+    """Average non-BatchNorm tensors while preserving client-local BN state."""
     if len(state_dicts) == 0:
         return {}
 
@@ -228,27 +234,25 @@ def fedbn(state_dicts, weights, cast_back=True):
         weights = [1.0] * len(weights)
         total_weight = float(len(weights))
 
-    keys = state_dicts[0].keys()
-    for sd in state_dicts[1:]:
+    keys = global_state.keys()
+    for sd in state_dicts:
         if sd.keys() != keys:
             raise ValueError("State dict keys mismatch across clients")
 
+    bn_keys = set(bn_keys)
     averaged = {}
     for k in keys:
-        t0 = state_dicts[0][k]
-        
-        # Skip BatchNorm parameters (keep local statistics)
-        if "running_mean" in k or "running_var" in k:
-            averaged[k] = t0.detach().cpu()
-        elif torch.is_floating_point(t0):
-            acc = torch.zeros_like(t0.detach().cpu(), dtype=torch.float32)
+        global_tensor = global_state[k].detach().cpu()
+
+        if k in bn_keys or not torch.is_floating_point(global_tensor):
+            averaged[k] = global_tensor.clone()
+        else:
+            acc = torch.zeros_like(global_tensor, dtype=torch.float32)
             for sd, w in zip(state_dicts, weights):
                 acc += sd[k].detach().cpu().to(torch.float32) * w
             out = acc / total_weight
             if cast_back:
-                out = out.to(dtype=t0.dtype)
+                out = out.to(dtype=global_tensor.dtype)
             averaged[k] = out
-        else:
-            averaged[k] = t0.detach().cpu()
 
     return averaged
