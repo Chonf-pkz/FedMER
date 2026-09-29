@@ -1,0 +1,38 @@
+# Example configuration for centralized LOSO on IEMOCAP
+
+dataset: IEMOCAP
+num_classes: 4
+
+model:
+  # Supported: fedalmer, memocmt, fleser, threemser, cemobam
+  name: fedalmer
+
+paths:
+  data_root: /home/tri.pm/polyp/fptu/MinhNhut/IEMOCAP_full_release/
+  # Use federated metadata/features (client_* folders)
+  metadata_base: metadata/IEMOCAP_loso/clients
+  features_base: features/IEMOCAP/clients
+  logs_root: logs/centralized
+  results_root: results
+
+loso:
+  split_by: speaker
+  # test_sessions: [1, 2, 3, 4, 5]
+  # val_session: null
+  # when val_speaker/test_speakers are both null, val defaults to Ses01F
+  # and test runs on remaining speakers
+  val_speaker: null
+  test_speakers: null
+  seed: 42
+  ignore_length: 0
+  exp_prefix: IEMOCAP_centralized
+  # run_id must match federated folder name under metadata/features
+  run_id: run_20250117_L0p3_C3
+  clean_metadata: false
+  clean_features: false
+  local_only: true
+
+train:
+  epochs: 50
+  batch_size: 128
+  modality: both

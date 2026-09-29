@@ -1,0 +1,52 @@
+# Example configuration for LOSO with fixed validation speaker
+
+dataset: IEMOCAP
+num_classes: 4
+
+model:
+  # Supported: fedalmer, memocmt, fleser, threemser, cemobam
+  name: fleser 
+
+paths:
+  data_root: /home/minhnhutngnn/IEMOCAP_full_release
+  out_base: metadata/IEMOCAP_loso/clients
+  run_id: run_20260608_speaker4shards_3emo_5seeds
+  features_base: features/IEMOCAP/clients
+  checkpoints_root: checkpoints/federated
+  logs_root: logs/federated
+
+loso:
+  split_by: speaker_shards
+  # speaker_shards: each speaker is split into 4 clients; each client
+  # contains samples from exactly one speaker and at most 3 emotion classes.
+  # Validation is split locally inside each client with 80/20 train/val;
+  # no shared validation session is used in this setting.
+  val_speaker: null
+  test_speakers: null
+  test_sessions: [5]
+  seeds: [42, 52, 103, 128, 923]
+  num_clients: null
+  shards_per_speaker: 4
+  emotions_per_client: 3
+  client_val_ratio: 0.2
+  min_labeled_per_client: 1
+  seed: 42
+  exp_prefix: IEMOCAP_speaker_shards
+  run_id: run_20260608_speaker4shards_3emo_5seeds
+  clean_metadata: false
+  clean_features: false
+  eval_checkpoint: best
+
+federated:
+  rounds_pretrain: 50
+  local_epochs_pretrain: 5
+  batch_size: 32
+  modality: both
+  lr: 0.0001
+  weight_decay: 0.01
+  weight_by: total
+  best_metric: global_UA
+  fl_method: feddc 
+  fedprox_mu: 0.0
+  scaffold_control_weighted: 0
+  num_workers: 5

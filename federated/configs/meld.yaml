@@ -1,0 +1,58 @@
+# Base configuration for MELD pipeline (preprocess + extract + train + eval)
+
+dataset: MELD
+num_classes: 7
+run_id: run_20250117_MELD_L1_C5
+
+model:
+  # Supported: fedalmer, memocmt, fleser, threemser, cemobam
+  name: fedalmer
+
+paths:
+  data_root: /home/minhnhutngnn/MELD_audio
+  meld_dir: metadata/MELD_preprocessed
+  audio_root: /home/minhnhutngnn/MELD_audio
+  clients_root: metadata/MELD_federated/clients
+  features_root: features/MELD/clients
+  checkpoints_root: checkpoints/federated
+  logs_root: logs/federated
+
+prepare:
+  data_root: /home/minhnhutngnn/MELD_audio
+  out_dir: metadata/MELD_preprocessed
+  train_csv: train_sent_emo.csv
+  val_csv: dev_sent_emo.csv
+  test_csv: test_sent_emo.csv
+  strict_audio: false
+
+preprocess:
+  split_by: speaker
+  dirichlet_alpha: 0.3
+  min_labeled_per_client: 1
+  meld_dir: metadata/MELD_preprocessed
+  out_dir: metadata/MELD_federated/clients
+  num_clients: 5
+  seed: 42
+
+extract:
+  dataset: MELD
+  clients_root: metadata/MELD_federated/clients
+  features_root: features/MELD/clients
+  audio_root: /home/minhnhutngnn/MELD_audio
+
+federated:
+  num_clients: 5
+  rounds_pretrain: 10
+  local_epochs_pretrain: 5
+  batch_size: 32
+  modality: both
+  lr: 0.0001
+  weight_decay: 0.01
+  seed: 42
+  seeds: [42, 52, 103]
+  weight_by: total
+  best_metric: global_UA
+  fl_method: fedavg
+  fedprox_mu: 0.0
+  num_workers: 5
+ 
