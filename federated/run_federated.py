@@ -285,7 +285,8 @@ def _run_for_seed(args, exp_name, seed):
 
         ckpt_root = os.path.join(args.checkpoints_root, exp_name, args.stage)
         log_root = os.path.join(args.logs_root, exp_name)
-        _reset_logs(log_root)
+        if not args.resume_global:
+            _reset_logs(log_root)
 
         cfg = _build_cfg(args, exp_name, local_epochs, seed=seed)
         run_stage(
@@ -303,7 +304,8 @@ def _run_for_seed(args, exp_name, seed):
         return args.stage, eval_results
 
     log_root = os.path.join(args.logs_root, exp_name)
-    _reset_logs(log_root)
+    if not args.resume_global:
+        _reset_logs(log_root)
 
     ckpt_root = os.path.join(args.checkpoints_root, exp_name, "pretrain")
     cfg = _build_cfg(args, exp_name, args.local_epochs_pretrain, seed=seed)

@@ -165,11 +165,11 @@ class FlexibleMMSER(nn.Module):
             return logits, fused
 
         if return_all:
-            return self.as_output_dict(logits, text_seq, audio_seq)
+            return self.as_output_dict(logits, fused, text_seq, audio_seq)
 
         return logits
 
-    def as_output_dict(self, logits, text_seq, audio_seq):
+    def as_output_dict(self, logits, fused, text_seq, audio_seq):
         """Helper to construct the outputs dict expected by combined losses and utils.train_and_evaluate.
 
         logits: tensor (B, C)
@@ -182,6 +182,7 @@ class FlexibleMMSER(nn.Module):
         audio_pool = audio_proj
         return {
             "logits": logits,
+            "fusion": fused,
             "text_proj": text_proj,
             "audio_proj": audio_proj,
             "text_pool": text_pool,

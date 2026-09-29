@@ -76,6 +76,7 @@ class ThreeMSER(nn.Module):
             text_pool = text_proj.mean(dim=1)
             return {
                 "logits": logits,
+                "fusion": x,
                 "text_proj": text_pool,
                 "audio_proj": audio_proj,
                 "text_pool": text_pool,

@@ -112,6 +112,7 @@ class MultiModalGNN(nn.Module):
         if return_all:
             return {
                 "logits": out,
+                "fusion": combined,
                 "text_proj": text_feat,
                 "audio_proj": audio_feat,
                 "text_pool": text_feat,
