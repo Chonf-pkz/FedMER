@@ -213,10 +213,15 @@ def process_dataset(
         else:
             raise TypeError(f"Unexpected item type: {type(item)}")
 
-        if os.path.isabs(filename):
+        if os.path.isabs(filename) and os.path.isfile(filename):
             audio_path = filename
         else:
-            audio_path = os.path.join(wav_base, os.path.basename(filename))
+            normalized = str(filename).replace("\\", "/")
+            session_match = re.search(r"(Session\d+/.*)$", normalized)
+            if session_match:
+                audio_path = os.path.join(wav_base, *session_match.group(1).split("/"))
+            else:
+                audio_path = os.path.join(wav_base, os.path.basename(filename))
 
         if isinstance(item, dict):
             text = item.get("text") or item.get("transcript") or item.get("utterance")

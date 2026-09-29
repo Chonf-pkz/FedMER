@@ -61,6 +61,25 @@ def _init_global_state(cfg, resume_path=None, init_state_dict=None):
     return model.state_dict()
 
 
+def _clone_subset(state_dict, keys):
+    return {key: state_dict[key].detach().cpu().clone() for key in keys}
+
+
+def _with_local_bn(global_state, local_bn_state):
+    state = {key: value.detach().cpu().clone() for key, value in global_state.items()}
+    state.update({key: value.detach().cpu().clone() for key, value in local_bn_state.items()})
+    return state
+
+
+def _bn_sidecar_path(checkpoint_path):
+    directory, filename = os.path.split(checkpoint_path)
+    if filename == "global_round_latest.pt":
+        return os.path.join(directory, "client_bn_states_latest.pt")
+    if filename.startswith("global_round_best_"):
+        return os.path.join(directory, filename.replace("global_round_", "client_bn_states_", 1))
+    return None
+
+
 def _aggregate_eval(eval_results, prefix):
     total = sum(r["num_samples"] for r in eval_results)
     if total <= 0:
@@ -113,6 +132,16 @@ def run_stage(
         raise ValueError(f"No clients found under {clients_root}")
 
     global_state = _init_global_state(cfg, resume_path=resume_path, init_state_dict=init_state_dict)
+    model = build_model(cfg["num_classes"], cfg["model_name"], cfg=cfg)
+    bn_keys = aggregation.batchnorm_state_keys(model)
+    client_bn_states = {client_id: _clone_subset(global_state, bn_keys) for client_id in clients}
+    if resume_path:
+        sidecar_path = _bn_sidecar_path(resume_path)
+        if sidecar_path and os.path.isfile(sidecar_path):
+            saved_bn_states = torch.load(sidecar_path, map_location="cpu")
+            for client_id in clients:
+                if client_id in saved_bn_states:
+                    client_bn_states[client_id] = saved_bn_states[client_id]
 
     client_log_path = os.path.join(log_root, "client_metrics.csv")
     round_log_path = os.path.join(log_root, "round_metrics.csv")
@@ -140,7 +169,7 @@ def run_stage(
                     "cfg": cfg,
                     "features_dir": features_dir,
                     "round_idx": round_idx,
-                    "init_state_dict": global_state,
+                    "init_state_dict": _with_local_bn(global_state, client_bn_states[client_id]),
                     "save_path": save_path,
                 }
             )
@@ -154,9 +183,12 @@ def run_stage(
 
         state_dicts = [result["state_dict"] for result in results]
         weights = [result["num_samples"] for result in results]
+        for result in results:
+            client_bn_states[result["client_id"]] = _clone_subset(result["state_dict"], bn_keys)
 
-        global_state = aggregation.fedbn(state_dicts, weights)
+        global_state = aggregation.fedbn(global_state, state_dicts, weights, bn_keys)
         global_ckpt_path = os.path.join(ckpt_root, "global_round_latest.pt")
+        bn_latest_path = os.path.join(ckpt_root, "client_bn_states_latest.pt")
         save_global_checkpoint(
             global_ckpt_path,
             global_state,
@@ -167,8 +199,10 @@ def run_stage(
                 "model_name": cfg["model_name"],
                 "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
                 "clients": clients,
+                "client_bn_path": bn_latest_path,
             },
         )
+        torch.save(client_bn_states, bn_latest_path)
 
         for result in results:
             metrics = result["metrics"]
@@ -200,7 +234,7 @@ def run_stage(
                     "client_id": client_id,
                     "cfg": cfg,
                     "features_dir": features_dir,
-                    "state_dict": global_state,
+                    "state_dict": _with_local_bn(global_state, client_bn_states[client_id]),
                     "split": "val",
                 }
             )
@@ -232,6 +266,7 @@ def run_stage(
             best_metric = float(metric_value)
             best_round = round_idx
             best_path = os.path.join(ckpt_root, f"global_round_best_{best_round}.pt")
+            best_bn_path = os.path.join(ckpt_root, f"client_bn_states_best_{best_round}.pt")
             save_global_checkpoint(
                 best_path,
                 global_state,
@@ -243,13 +278,16 @@ def run_stage(
                     "metric": metric_key,
                     "metric_value": best_metric,
                     "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
+                    "client_bn_path": best_bn_path,
                 },
             )
+            torch.save(client_bn_states, best_bn_path)
             torch.save(
                 {
                     "best_round": best_round,
                     "best_metric": best_metric,
                     "best_path": best_path,
+                    "client_bn_path": best_bn_path,
                 },
                 os.path.join(ckpt_root, "best_meta.pt"),
             )

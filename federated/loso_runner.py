@@ -438,7 +438,11 @@ def parse_args():
             parser.set_defaults(**{key: value})
     args = parser.parse_args()
     args.model_name = normalize_model_name(args.model_name)
-    needs_data_root = (not args.skip_preprocess) or (not args.skip_features) or (args.dataset == "MSP-IMPROV")
+    needs_data_root = (not args.skip_preprocess) or (not args.skip_features)
+    if args.dataset == "MSP-IMPROV" and args.split_by == "speaker":
+        needs_data_root = True
+    if args.dataset == "MSP-IMPROV" and args.split_by != "speaker" and not _parse_int_list(args.test_sessions):
+        needs_data_root = True
     if needs_data_root and not args.data_root:
         parser.error(
             "Missing required arg: data_root "
@@ -455,9 +459,11 @@ def main():
     if args.dataset == "IEMOCAP":
         speaker_candidates = list(IEMOCAP_SPEAKERS)
     elif args.dataset == "MSP-IMPROV":
-        speaker_candidates = _collect_msp_speakers(args.data_root)
-        if len(speaker_candidates) < 3:
-            raise ValueError("MSP-IMPROV requires at least 3 speakers for LOSO.")
+        speaker_candidates = []
+        if args.split_by == "speaker":
+            speaker_candidates = _collect_msp_speakers(args.data_root)
+            if len(speaker_candidates) < 3:
+                raise ValueError("MSP-IMPROV requires at least 3 speakers for LOSO.")
     else:
         raise ValueError(f"Unsupported dataset: {args.dataset}")
 
@@ -497,9 +503,10 @@ def main():
         if args.dataset == "IEMOCAP":
             session_ids = [1, 2, 3, 4, 5]
         elif args.dataset == "MSP-IMPROV":
-            session_ids = _collect_msp_sessions(args.data_root)
-            if len(session_ids) < 3:
-                raise ValueError("MSP-IMPROV requires at least 3 sessions for LOSO.")
+            requested_sessions = _parse_int_list(args.test_sessions)
+            session_ids = _collect_msp_sessions(args.data_root) if args.data_root else requested_sessions
+            if not session_ids:
+                raise ValueError("MSP-IMPROV requires data_root or explicit test_sessions.")
         else:
             raise ValueError(f"Unsupported dataset for split_by=session: {args.dataset}")
         test_sessions = _parse_int_list(args.test_sessions)
